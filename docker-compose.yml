@@ -1,0 +1,68 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: ppob_db
+    environment:
+      POSTGRES_USER: ppob_user
+      POSTGRES_PASSWORD: ppob_password
+      POSTGRES_DB: ppob_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - ppob_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ppob_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ppob_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ppob_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ppob_app
+    environment:
+      DATABASE_URL: postgresql://ppob_user:ppob_password@db:5432/ppob_db
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: your-secret-key-here
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ppob_network
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  ppob_network:
+    driver: bridge

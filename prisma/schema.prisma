@@ -1,0 +1,344 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String     @id @default(cuid())
+  email             String     @unique
+  password          String
+  name              String
+  phone             String?
+  role              Role       @default(CUSTOMER)
+  status            UserStatus @default(ACTIVE)
+  profileImage      String?
+  identityNumber    String?
+  identityType      String?
+  address           String?
+  city              String?
+  province          String?
+  postalCode        String?
+  bankName          String?
+  bankAccount       String?
+  businessName      String?
+  businessType      String?
+  npwp              String?
+  ktp               String?
+  skdu              String?
+  verificationDate  DateTime?
+  isVerified        Boolean    @default(false)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  
+  transactions      Transaction[]
+  deposits          Deposit[]
+  commissions       Commission[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  settings          UserSetting?
+  affiliateLink     AffiliateLink?
+  referrals         User[]     @relation("referrals")
+  referrer          User?      @relation("referrals", fields: [referrerId], references: [id])
+  referrerId        String?
+  
+  @@index([email])
+  @@index([role])
+  @@index([status])
+}
+
+model UserSetting {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  darkMode          Boolean  @default(false)
+  theme             String   @default("light")
+  language          String   @default("id")
+  notificationEmail Boolean  @default(true)
+  notificationSMS   Boolean  @default(true)
+  notificationWA    Boolean  @default(true)
+  emailMarketing    Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model AffiliateLink {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code              String   @unique
+  link              String
+  clicks            Int      @default(0)
+  conversions       Int      @default(0)
+  totalCommission   Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([code])
+}
+
+model Transaction {
+  id                String            @id @default(cuid())
+  userId            String
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactionNumber String            @unique
+  type              TransactionType
+  category          Category          @relation(fields: [categoryId], references: [id])
+  categoryId        String
+  service           String
+  amount            Decimal           @db.Decimal(12, 2)
+  adminFee          Decimal           @default(0) @db.Decimal(12, 2)
+  totalAmount       Decimal           @db.Decimal(12, 2)
+  status            TransactionStatus @default(PENDING)
+  paymentMethod     PaymentMethod
+  paymentProof      String?
+  invoiceNumber     String?
+  referenceNumber   String?
+  description       String?
+  notes             String?
+  externalId        String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  completedAt       DateTime?
+  
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model Category {
+  id                String         @id @default(cuid())
+  name              String         @unique
+  slug              String         @unique
+  description       String?
+  icon              String?
+  image             String?
+  type              String
+  isActive          Boolean        @default(true)
+  order             Int            @default(0)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  transactions      Transaction[]
+  products          Product[]
+  
+  @@index([slug])
+}
+
+model Product {
+  id                String         @id @default(cuid())
+  categoryId        String
+  category          Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name              String
+  slug              String         @unique
+  description       String?
+  price             Decimal        @db.Decimal(12, 2)
+  adminFee          Decimal        @default(0) @db.Decimal(12, 2)
+  margin            Decimal        @default(0) @db.Decimal(12, 2)
+  code              String         @unique
+  isActive          Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  @@index([categoryId])
+  @@index([slug])
+}
+
+model Deposit {
+  id                String          @id @default(cuid())
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  depositNumber     String          @unique
+  amount            Decimal         @db.Decimal(12, 2)
+  paymentMethod     PaymentMethod
+  status            DepositStatus   @default(PENDING)
+  bankName          String?
+  bankAccount       String?
+  bankTransferId    String?
+  paymentProof      String?
+  notes             String?
+  externalId        String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  confirmAt         DateTime?
+  
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Commission {
+  id                String          @id @default(cuid())
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactionId     String?
+  amount            Decimal         @db.Decimal(12, 2)
+  type              CommissionType
+  status            CommissionStatus @default(PENDING)
+  withdrawnAt       DateTime?
+  notes             String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+}
+
+model Notification {
+  id                String            @id @default(cuid())
+  userId            String
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title             String
+  message           String
+  type              NotificationType
+  isRead            Boolean           @default(false)
+  data              Json?
+  createdAt         DateTime          @default(now())
+  
+  @@index([userId])
+  @@index([isRead])
+}
+
+model AuditLog {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action            String
+  entity            String
+  entityId          String
+  oldValue          Json?
+  newValue          Json?
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime @default(now())
+  
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model Voucher {
+  id                String          @id @default(cuid())
+  code              String          @unique
+  name              String
+  description       String?
+  discountType      DiscountType
+  discountValue     Decimal         @db.Decimal(12, 2)
+  maxUsage          Int?
+  usageCount        Int             @default(0)
+  minAmount         Decimal         @default(0) @db.Decimal(12, 2)
+  maxAmount         Decimal?        @db.Decimal(12, 2)
+  startDate         DateTime
+  endDate           DateTime
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  @@index([code])
+}
+
+model FlashSale {
+  id                String   @id @default(cuid())
+  name              String
+  description       String?
+  discountPercent   Decimal  @db.Decimal(5, 2)
+  startTime         DateTime
+  endTime           DateTime
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([startTime])
+  @@index([endTime])
+}
+
+model Page {
+  id                String   @id @default(cuid())
+  slug              String   @unique
+  title             String
+  content           String
+  seoTitle          String?
+  seoDescription    String?
+  seoKeywords       String?
+  isPublished       Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  RESELLER
+  AFFILIATE
+  CUSTOMER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  BANNED
+}
+
+enum TransactionType {
+  PURCHASE
+  WITHDRAWAL
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  MANUAL_TRANSFER
+  QRIS
+  E_WALLET
+  CREDIT_CARD
+  BANK_TRANSFER
+}
+
+enum DepositStatus {
+  PENDING
+  VERIFIED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum CommissionType {
+  RESELLER
+  AFFILIATE
+  REFERRAL
+}
+
+enum CommissionStatus {
+  PENDING
+  APPROVED
+  WITHDRAWN
+  CANCELLED
+}
+
+enum NotificationType {
+  TRANSACTION
+  DEPOSIT
+  COMMISSION
+  SYSTEM
+  PROMOTION
+  ACCOUNT
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
